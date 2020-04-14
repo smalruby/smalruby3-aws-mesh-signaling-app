@@ -31,7 +31,7 @@ exports.handler = async event => {
 
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
             const putParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 Item: {
                     meshId: meshId,
                     connectionId: connectionId,

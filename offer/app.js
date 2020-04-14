@@ -36,7 +36,7 @@ exports.handler = async event => {
             // TODO: validate clientDescription
 
             const scanParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 ProjectionExpression: 'connectionId, meshId',
                 FilterExpression: 'meshId = :meshId and isHost = :isHost',
                 ExpressionAttributeValues: {
@@ -55,7 +55,7 @@ exports.handler = async event => {
 
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
             const putParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 Item: {
                     meshId: meshId,
                     connectionId: connectionId,

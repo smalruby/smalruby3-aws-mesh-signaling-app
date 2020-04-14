@@ -28,7 +28,7 @@ exports.handler = async event => {
             response.data.meshId = meshId;
 
             const scanParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 ProjectionExpression: 'meshId, #ttl',
                 FilterExpression: 'isHost = :isHost',
                 ExpressionAttributeNames: {

@@ -35,28 +35,31 @@ exports.handler = async event => {
             const hostDescription = postData.hostDescription;
             // TODO: validate hostDescription
 
-            const getItemParams = {
-                TableName: process.env.TABLE_NAME,
-                ProjectionExpression: 'meshId, isHost',
+            const getParams = {
+                TableName: TABLE_NAME,
                 Key: {
                     connectionId: connectionId
-                }
+                },
+                ProjectionExpression: 'meshId, isHost'
             };
-            const hostData = await ddb.getItem(getItemParams).promise();
-            if (hostData) {
-                if (hostData.meshId !== meshId) {
-                    throw `Invalid Host Mesh ID: expected=<${hostData.meshId}> actual=<${meshId}>`;
+
+            const hostData = await ddb.get(getParams).promise();
+            const host = hostData.Item;
+            if (host) {
+                if (host.meshId !== meshId) {
+                    throw `Invalid Host Mesh ID: expected=<${host.meshId}> actual=<${meshId}>`;
                 }
-                if (!hostData.isHost) {
+
+                if (!host.isHost) {
                     throw 'You are not Host';
-                }
+                    }
             } else {
                 throw `Already expired: meshId=<${meshId}>`;
             }
 
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
             const putParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 Item: {
                     meshId: meshId,
                     connectionId: connectionId,
@@ -68,7 +71,7 @@ exports.handler = async event => {
             await ddb.put(putParams).promise();
 
             const scanParams = {
-                TableName: process.env.TABLE_NAME,
+                TableName: TABLE_NAME,
                 ProjectionExpression: 'connectionId, meshId',
                 FilterExpression: 'meshId = :meshId and isHost = :isHost',
                 ExpressionAttributeValues: {
