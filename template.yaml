@@ -100,11 +100,11 @@ Resources:
     Type: AWS::DynamoDB::Table
     Properties:
       AttributeDefinitions:
-      - AttributeName: "connectionId"
-        AttributeType: "S"
+      - AttributeName: connectionId
+        AttributeType: S
       KeySchema:
-      - AttributeName: "connectionId"
-        KeyType: "HASH"
+      - AttributeName: connectionId
+        KeyType: HASH
       ProvisionedThroughput:
         ReadCapacityUnits: 5
         WriteCapacityUnits: 5
