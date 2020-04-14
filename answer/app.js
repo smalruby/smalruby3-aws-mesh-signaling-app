@@ -35,9 +35,26 @@ exports.handler = async event => {
             const hostDescription = postData.hostDescription;
             // TODO: validate hostDescription
 
+            const getItemParams = {
+                TableName: process.env.TABLE_NAME,
+                ProjectionExpression: 'meshId, isHost',
+                Key: {
+                    connectionId: connectionId
+                }
+            };
+            const hostData = await ddb.getItem(getItemParams).promise();
+            if (hostData) {
+                if (hostData.meshId !== meshId) {
+                    throw `Invalid Host Mesh ID: expected=<${hostData.meshId}> actual=<${meshId}>`;
+                }
+                if (!hostData.isHost) {
+                    throw 'You are not Host';
+                }
+            } else {
+                throw `Already expired: meshId=<${meshId}>`;
+            }
+
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
-            // TODO: update host ttl, check isHost
-            /*
             const putParams = {
                 TableName: process.env.TABLE_NAME,
                 Item: {
@@ -49,7 +66,6 @@ exports.handler = async event => {
                 }
             };
             await ddb.put(putParams).promise();
-            */
 
             const scanParams = {
                 TableName: process.env.TABLE_NAME,
