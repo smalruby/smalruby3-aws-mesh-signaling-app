@@ -4,8 +4,6 @@ const ddb = new AWS.DynamoDB.DocumentClient({ apiVersion: '2012-08-10', region: 
 
 const { TABLE_NAME } = process.env;
 
-const TTL_SECONDS = 5 * 60;
-
 exports.handler = async event => {
     try {
         const connectionId = event.requestContext.connectionId;
@@ -17,7 +15,7 @@ exports.handler = async event => {
         });
 
         const response = {
-            action: 'register',
+            action: 'list',
             result: false,
             data: {}
         };
@@ -26,23 +24,14 @@ exports.handler = async event => {
             const postData = JSON.parse(event.body).data;
 
             const meshId = postData.meshId;
-            // TODO: validate meshId
             response.data.meshId = meshId;
 
-            const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
-
-            const putParams = {
+            const scanParams = {
                 TableName: process.env.TABLE_NAME,
-                Item: {
-                    meshId: meshId,
-                    connectionId: connectionId,
-                    host: 1,
-                    sourceIp: sourceIp,
-                    ttl: ttl
-                }
+                FilterExpression: 'host = 1',
+                ProjectionExpression: 'meshId, ttl'
             };
-            await ddb.put(putParams).promise();
-
+            response.data.hosts = await ddb.scan(scanParams).promise();
             response.result = true;
 
             await apigwManagementApi.postToConnection({
@@ -50,7 +39,7 @@ exports.handler = async event => {
                 Data: JSON.stringify(response)
             }).promise();
 
-            return { statusCode: 200, body: 'Registered.' };
+            return { statusCode: 200, body: 'Listed.' };
         }
         catch (err){
             response.data.error = JSON.stringify(err);
@@ -63,6 +52,6 @@ exports.handler = async event => {
             throw err;
         }
     } catch (err) {
-        return { statusCode: 500, body: 'Failed to register: ' + JSON.stringify(err) };
+        return { statusCode: 500, body: 'Failed to list: ' + JSON.stringify(err) };
     }
 };
