@@ -102,6 +102,46 @@ Resources:
       IntegrationUri:
         Fn::Sub:
             arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ListFunction.Arn}/invocations
+  OfferRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      RouteKey: offer
+      AuthorizationType: NONE
+      OperationName: OfferRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref OfferInteg
+  OfferInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      Description: Send Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OfferFunction.Arn}/invocations
+  AnswerRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      RouteKey: answer
+      AuthorizationType: NONE
+      OperationName: AnswerRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref AnswerInteg
+  AnswerInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      Description: Send Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${AnswerFunction.Arn}/invocations
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
@@ -109,6 +149,8 @@ Resources:
     - DisconnectRoute
     - RegisterRoute
     - ListRoute
+    - OfferRoute
+    - AnswerRoute
     Properties:
       ApiId: !Ref MeshSignalingWebSocket
   Stage:
@@ -232,6 +274,60 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref ListFunction
       Principal: apigateway.amazonaws.com
+  OfferFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: offer/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MeshSignalingWebSocket}/*'
+  OfferPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MeshSignalingWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OfferFunction
+      Principal: apigateway.amazonaws.com
+  AnswerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: answer/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MeshSignalingWebSocket}/*'
+  AnswerPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MeshSignalingWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref AnswerFunction
+      Principal: apigateway.amazonaws.com
 
 Outputs:
   ConnectionsTableArn:
@@ -253,6 +349,14 @@ Outputs:
   ListFunctionArn:
     Description: "List ARN"
     Value: !GetAtt ListFunction.Arn
+
+  OfferFunctionArn:
+    Description: "Offer ARN"
+    Value: !GetAtt OfferFunction.Arn
+
+  AnswerFunctionArn:
+    Description: "Answer ARN"
+    Value: !GetAtt AnswerFunction.Arn
 
   WebSocketURI:
     Description: "The WSS Protocol URI to connect to"

@@ -17,7 +17,7 @@ exports.handler = async event => {
         });
 
         const response = {
-            action: 'register',
+            action: 'offer',
             result: false,
             data: {}
         };
@@ -29,18 +29,55 @@ exports.handler = async event => {
             // TODO: validate meshId
             response.data.meshId = meshId;
 
+            const hostMeshId = postData.hostMeshId;
+            // TODO: validate hostMeshId
+
+            const clientDescription = postData.clientDescription;
+            // TODO: validate clientDescription
+
+            const scanParams = {
+                TableName: process.env.TABLE_NAME,
+                ProjectionExpression: 'connectionId, meshId',
+                FilterExpression: 'meshId = :meshId and isHost = :isHost',
+                ExpressionAttributeValues: {
+                    ':meshId': hostMeshId,
+                    ':isHost': 1
+                }
+            };
+            const hostData = await ddb.scan(scanParams).promise();
+            if (hostData.Items.length !== 1) {
+                throw `Not registered Host Mesh ID: ${hostMeshId}`;
+            }
+
+            const host = hostData.Items[0];
+            const hostConnectionId = host.connectionId;
+            response.data.hostMeshId = host.meshId;
+
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
             const putParams = {
                 TableName: process.env.TABLE_NAME,
                 Item: {
                     meshId: meshId,
                     connectionId: connectionId,
-                    isHost: 1,
+                    isHost: 0,
                     sourceIp: sourceIp,
                     ttl: ttl
                 }
             };
             await ddb.put(putParams).promise();
+
+            const offerToHost = {
+                action: 'offer',
+                data: {
+                    meshId: meshId,
+                    hostMeshId: host.meshId,
+                    clientDescription: clientDescription
+                }
+            };
+            await apigwManagementApi.postToConnection({
+                ConnectionId: hostConnectionId,
+                Data: JSON.stringify(offerToHost)
+            }).promise();
 
             response.result = true;
 
@@ -49,7 +86,7 @@ exports.handler = async event => {
                 Data: JSON.stringify(response)
             }).promise();
 
-            return { statusCode: 200, body: 'Registered.' };
+            return { statusCode: 200, body: 'Offered.' };
         }
         catch (err){
             response.data.error = JSON.stringify(err);
@@ -62,6 +99,6 @@ exports.handler = async event => {
             throw err;
         }
     } catch (err) {
-        return { statusCode: 500, body: 'Failed to register: ' + JSON.stringify(err) };
+        return { statusCode: 500, body: 'Failed to offer: ' + JSON.stringify(err) };
     }
 };

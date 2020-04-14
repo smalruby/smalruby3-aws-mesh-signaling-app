@@ -24,6 +24,7 @@ exports.handler = async event => {
             const postData = JSON.parse(event.body).data;
 
             const meshId = postData.meshId;
+            // TODO: validate meshId
             response.data.meshId = meshId;
 
             const scanParams = {
@@ -39,6 +40,7 @@ exports.handler = async event => {
             };
             const hostsData = await ddb.scan(scanParams).promise();
             response.data.hosts = hostsData.Items;
+
             response.result = true;
 
             await apigwManagementApi.postToConnection({

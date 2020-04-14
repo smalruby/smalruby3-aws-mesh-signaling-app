@@ -17,7 +17,7 @@ exports.handler = async event => {
         });
 
         const response = {
-            action: 'register',
+            action: 'answer',
             result: false,
             data: {}
         };
@@ -29,7 +29,15 @@ exports.handler = async event => {
             // TODO: validate meshId
             response.data.meshId = meshId;
 
+            const clientMeshId = postData.clientMeshId;
+            // TODO: validate clientMeshId
+
+            const hostDescription = postData.hostDescription;
+            // TODO: validate hostDescription
+
             const ttl = Math.floor(Date.now() / 1000) + TTL_SECONDS;
+            // TODO: update host ttl, check isHost
+            /*
             const putParams = {
                 TableName: process.env.TABLE_NAME,
                 Item: {
@@ -41,6 +49,38 @@ exports.handler = async event => {
                 }
             };
             await ddb.put(putParams).promise();
+            */
+
+            const scanParams = {
+                TableName: process.env.TABLE_NAME,
+                ProjectionExpression: 'connectionId, meshId',
+                FilterExpression: 'meshId = :meshId and isHost = :isHost',
+                ExpressionAttributeValues: {
+                    ':meshId': clientMeshId,
+                    ':isHost': 0
+                }
+            };
+            const clientData = await ddb.scan(scanParams).promise();
+            if (clientData.Items.length !== 1) {
+                throw `Not exists Client Mesh ID: ${clientMeshId}`;
+            }
+
+            const client = clientData.Items[0];
+            const clientConnectionId = client.connectionId;
+            response.data.clientMeshId = client.meshId;
+
+            const answerToClient = {
+                action: 'answer',
+                data: {
+                    meshId: meshId,
+                    clientMeshId: client.meshId,
+                    hostDescription: hostDescription
+                }
+            };
+            await apigwManagementApi.postToConnection({
+                ConnectionId: clientConnectionId,
+                Data: JSON.stringify(answerToClient)
+            }).promise();
 
             response.result = true;
 
@@ -49,7 +89,7 @@ exports.handler = async event => {
                 Data: JSON.stringify(response)
             }).promise();
 
-            return { statusCode: 200, body: 'Registered.' };
+            return { statusCode: 200, body: 'Answered.' };
         }
         catch (err){
             response.data.error = JSON.stringify(err);
@@ -62,6 +102,6 @@ exports.handler = async event => {
             throw err;
         }
     } catch (err) {
-        return { statusCode: 500, body: 'Failed to register: ' + JSON.stringify(err) };
+        return { statusCode: 500, body: 'Failed to answer: ' + JSON.stringify(err) };
     }
 };
