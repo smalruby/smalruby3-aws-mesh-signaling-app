@@ -36,7 +36,7 @@ exports.handler = async event => {
                 Item: {
                     meshId: meshId,
                     connectionId: connectionId,
-                    host: 1,
+                    isHost: 1,
                     sourceIp: sourceIp,
                     ttl: ttl
                 }

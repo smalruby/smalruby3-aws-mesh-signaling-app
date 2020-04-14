@@ -28,10 +28,17 @@ exports.handler = async event => {
 
             const scanParams = {
                 TableName: process.env.TABLE_NAME,
-                FilterExpression: 'host = 1',
-                ProjectionExpression: 'meshId, ttl'
+                ProjectionExpression: 'meshId, #ttl',
+                FilterExpression: 'isHost = :isHost',
+                ExpressionAttributeNames: {
+                    '#ttl': 'ttl'
+                },
+                ExpressionAttributeValues: {
+                    ':isHost': 1
+                }
             };
-            response.data.hosts = await ddb.scan(scanParams).promise();
+            const hostsData = await ddb.scan(scanParams).promise();
+            response.data.hosts = hostsData.Items;
             response.result = true;
 
             await apigwManagementApi.postToConnection({
