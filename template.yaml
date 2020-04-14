@@ -3,37 +3,204 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   smalruby3-aws-mesh-signaling-app
 
-  Sample SAM Template for smalruby3-aws-mesh-signaling-app
+  WebRTC signaling application for Smalruby3 Mesh extension on AWS
   
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
-Globals:
-  Function:
-    Timeout: 3
+Parameters:
+  TableName:
+    Type: String
+    Default: 'smalruby_mesh_signaling_connections'
+    Description: (Required) The name of the new DynamoDB to store connection identifiers for each connected clients. Minimum 3 characters
+    MinLength: 3
+    MaxLength: 50
+    AllowedPattern: ^[A-Za-z_]+$
+    ConstraintDescription: 'Required. Can be characters and underscore only. No numbers or special characters allowed.'
 
 Resources:
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  MeshSignalingWebSocket:
+    Type: AWS::ApiGatewayV2::Api
     Properties:
-      CodeUri: hello-world/
-      Handler: app.lambdaHandler
+      Name: Smalruby3 Mesh Signaling WebSocket
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: "$request.body.action"
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      RouteKey: $connect
+      AuthorizationType: NONE
+      OperationName: ConnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref ConnectInteg
+  ConnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      Description: Connect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      RouteKey: $disconnect
+      AuthorizationType: NONE
+      OperationName: DisconnectRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref DisconnectInteg
+  DisconnectInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      Description: Disconnect Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnDisconnectFunction.Arn}/invocations
+  RegisterRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      RouteKey: register
+      AuthorizationType: NONE
+      OperationName: RegisterRoute
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref RegisterInteg
+  RegisterInteg:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+      Description: Send Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri: 
+        Fn::Sub:
+            arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RegisterFunction.Arn}/invocations
+  Deployment:
+    Type: AWS::ApiGatewayV2::Deployment
+    DependsOn:
+    - DisconnectRoute
+    - RegisterRoute
+    Properties:
+      ApiId: !Ref MeshSignalingWebSocket
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      StageName: dev
+      Description: Development Stage
+      DeploymentId: !Ref Deployment
+      ApiId: !Ref MeshSignalingWebSocket
+  ConnectionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+      - AttributeName: "connectionId"
+        AttributeType: "S"
+      KeySchema:
+      - AttributeName: "connectionId"
+        KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      SSESpecification:
+        SSEEnabled: True
+      TableName: !Ref TableName
+      TimeToLiveSpecification:
+         AttributeName: "ttl"
+         Enabled: True
+  OnConnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: onconnect/
+      Handler: app.handler
+      MemorySize: 256
       Runtime: nodejs12.x
-      Events:
-        HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
-          Properties:
-            Path: /hello
-            Method: get
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+  OnConnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MeshSignalingWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnConnectFunction
+      Principal: apigateway.amazonaws.com
+  OnDisconnectFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ondisconnect/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+  OnDisconnectPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MeshSignalingWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref OnDisconnectFunction
+      Principal: apigateway.amazonaws.com
+  RegisterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: register/
+      Handler: app.handler
+      MemorySize: 256
+      Runtime: nodejs12.x
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref TableName
+      Policies:
+      - DynamoDBCrudPolicy:
+          TableName: !Ref TableName
+      - Statement:
+        - Effect: Allow
+          Action:
+          - 'execute-api:ManageConnections'
+          Resource:
+          - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${MeshSignalingWebSocket}/*'
+  RegisterPermission:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MeshSignalingWebSocket
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref RegisterFunction
+      Principal: apigateway.amazonaws.com
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  ConnectionsTableArn:
+    Description: "Connections table ARN"
+    Value: !GetAtt ConnectionsTable.Arn
+
+  OnConnectFunctionArn:
+    Description: "OnConnect function ARN"
+    Value: !GetAtt OnConnectFunction.Arn
+
+  OnDisconnectFunctionArn:
+    Description: "OnDisconnect function ARN"
+    Value: !GetAtt OnDisconnectFunction.Arn
+
+  RegisterFunctionArn:
+    Description: "Register ARN"
+    Value: !GetAtt RegisterFunction.Arn
+
+  WebSocketURI:
+    Description: "The WSS Protocol URI to connect to"
+    Value: !Join [ '', [ 'wss://', !Ref MeshSignalingWebSocket, '.execute-api.',!Ref 'AWS::Region','.amazonaws.com/',!Ref 'Stage'] ]

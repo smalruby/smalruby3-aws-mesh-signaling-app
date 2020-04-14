@@ -1,0 +1,11 @@
+{
+  "name": "register",
+  "version": "1.0.0",
+  "description": "register",
+  "main": "app.js",
+  "author": "Ruby Programming Shounendan",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.655.0"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "on-disconnect",
+  "version": "1.0.0",
+  "description": "$disconnect",
+  "main": "app.js",
+  "author": "Ruby Programming Shounendan",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.655.0"
+  }
+}
