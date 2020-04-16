@@ -52,7 +52,7 @@ exports.handler = async event => {
 
                 if (!host.isHost) {
                     throw 'You are not Host';
-                    }
+                }
             } else {
                 throw `Already expired: meshId=<${meshId}>`;
             }
@@ -73,10 +73,11 @@ exports.handler = async event => {
             const scanParams = {
                 TableName: TABLE_NAME,
                 ProjectionExpression: 'connectionId, meshId',
-                FilterExpression: 'meshId = :meshId and isHost = :isHost',
+                FilterExpression: 'meshId = :meshId and isHost = :isHost and sourceIp = :sourceIp',
                 ExpressionAttributeValues: {
                     ':meshId': clientMeshId,
-                    ':isHost': 0
+                    ':isHost': 0,
+                    ':sourceIp': sourceIp
                 }
             };
             const clientData = await ddb.scan(scanParams).promise();

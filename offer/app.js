@@ -38,10 +38,11 @@ exports.handler = async event => {
             const scanParams = {
                 TableName: TABLE_NAME,
                 ProjectionExpression: 'connectionId, meshId',
-                FilterExpression: 'meshId = :meshId and isHost = :isHost',
+                FilterExpression: 'meshId = :meshId and isHost = :isHost and sourceIp = :sourceIp',
                 ExpressionAttributeValues: {
                     ':meshId': hostMeshId,
-                    ':isHost': 1
+                    ':isHost': 1,
+                    ':sourceIp': sourceIp
                 }
             };
             const hostData = await ddb.scan(scanParams).promise();
