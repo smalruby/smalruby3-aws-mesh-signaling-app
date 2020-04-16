@@ -40,7 +40,9 @@ exports.handler = async event => {
                 }
             };
             const hostsData = await ddb.scan(scanParams).promise();
-            response.data.hosts = hostsData.Items;
+            response.data.hosts = hostsData.Items.sort((a, b) => {
+                return b.ttl - a.ttl;
+            });
 
             response.result = true;
 
