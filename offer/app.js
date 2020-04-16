@@ -35,18 +35,21 @@ exports.handler = async event => {
             const clientDescription = postData.clientDescription;
             // TODO: validate clientDescription
 
-            const scanParams = {
+            const queryParams = {
                 TableName: TABLE_NAME,
-                ProjectionExpression: 'connectionId, meshId',
-                FilterExpression: 'meshId = :meshId and isHost = :isHost and sourceIp = :sourceIp',
+                IndexName: 'meshId-index',
+                KeyConditionExpression: 'meshId = :meshId',
+                FilterExpression: 'sourceIp = :sourceIp and isHost = :isHost',
                 ExpressionAttributeValues: {
                     ':meshId': hostMeshId,
-                    ':isHost': 1,
-                    ':sourceIp': sourceIp
-                }
+                    ':sourceIp': sourceIp,
+                    ':isHost': 1
+                },
+                ProjectionExpression: 'connectionId, meshId',
+                Limit: 1
             };
-            const hostData = await ddb.scan(scanParams).promise();
-            if (hostData.Items.length !== 1) {
+            const hostData = await ddb.query(queryParams).promise();
+            if (!hostData || hostData.Items.length !== 1) {
                 throw `Not registered Host Mesh ID: ${hostMeshId}`;
             }
 

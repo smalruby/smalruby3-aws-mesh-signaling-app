@@ -70,18 +70,22 @@ exports.handler = async event => {
             };
             await ddb.put(putParams).promise();
 
-            const scanParams = {
+            const queryParams = {
                 TableName: TABLE_NAME,
-                ProjectionExpression: 'connectionId, meshId',
-                FilterExpression: 'meshId = :meshId and isHost = :isHost and sourceIp = :sourceIp',
+                IndexName: 'meshId-index',
+                KeyConditionExpression: 'meshId = :meshId',
+                FilterExpression: 'sourceIp = :sourceIp and isHost = :isHost',
                 ExpressionAttributeValues: {
                     ':meshId': clientMeshId,
-                    ':isHost': 0,
-                    ':sourceIp': sourceIp
-                }
+                    ':sourceIp': sourceIp,
+                    ':isHost': 0
+                },
+                ProjectionExpression: 'connectionId, meshId',
+                Limit: 1
             };
-            const clientData = await ddb.scan(scanParams).promise();
-            if (clientData.Items.length !== 1) {
+
+            const clientData = await ddb.query(queryParams).promise();
+            if (!clientData || clientData.Items.length !== 1) {
                 throw `Not exists Client Mesh ID: ${clientMeshId}`;
             }
 

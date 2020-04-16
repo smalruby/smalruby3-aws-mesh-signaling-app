@@ -27,19 +27,20 @@ exports.handler = async event => {
             // TODO: validate meshId
             response.data.meshId = meshId;
 
-            const scanParams = {
+            const queryParams = {
                 TableName: TABLE_NAME,
+                IndexName: 'sourceIp-isHost-index',
+                KeyConditionExpression: 'sourceIp = :sourceIp and isHost = :isHost',
                 ProjectionExpression: 'meshId, #ttl',
-                FilterExpression: 'isHost = :isHost and sourceIp = :sourceIp',
                 ExpressionAttributeNames: {
                     '#ttl': 'ttl'
                 },
                 ExpressionAttributeValues: {
-                    ':isHost': 1,
-                    ':sourceIp': sourceIp
+                    ':sourceIp': sourceIp,
+                    ':isHost': 1
                 }
             };
-            const hostsData = await ddb.scan(scanParams).promise();
+            const hostsData = await ddb.query(queryParams).promise();
             response.data.hosts = hostsData.Items.sort((a, b) => {
                 return b.ttl - a.ttl;
             });

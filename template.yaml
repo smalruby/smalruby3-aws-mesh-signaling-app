@@ -166,6 +166,33 @@ Resources:
       AttributeDefinitions:
       - AttributeName: connectionId
         AttributeType: S
+      - AttributeName: sourceIp
+        AttributeType: S
+      - AttributeName: isHost
+        AttributeType: N
+      - AttributeName: meshId
+        AttributeType: S
+      GlobalSecondaryIndexes:
+      - IndexName: sourceIp-isHost-index
+        KeySchema:
+        - AttributeName: sourceIp
+          KeyType: HASH
+        - AttributeName: isHost
+          KeyType: RANGE
+        Projection:
+          ProjectionType: ALL
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
+      - IndexName: meshId-index
+        KeySchema:
+        - AttributeName: meshId
+          KeyType: HASH
+        Projection:
+          ProjectionType: ALL
+        ProvisionedThroughput:
+          ReadCapacityUnits: 5
+          WriteCapacityUnits: 5
       KeySchema:
       - AttributeName: connectionId
         KeyType: HASH
@@ -176,7 +203,7 @@ Resources:
         SSEEnabled: True
       TableName: !Ref TableName
       TimeToLiveSpecification:
-         AttributeName: "ttl"
+         AttributeName: ttl
          Enabled: True
   OnConnectFunction:
     Type: AWS::Serverless::Function
